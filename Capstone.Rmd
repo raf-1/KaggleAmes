@@ -1,0 +1,228 @@
+---
+title: "Project"
+author: "Rafael Asuncion"
+date: "May 18, 2017"
+output: word_document
+---
+
+Step1: Collecting the data
+
+For this data exploration, we shall be examining the Ames Housing Dataset
+```{r cars}
+housing <- read.csv("C:/Users/Rafael Asuncion/Documents/WORK/Capstone/train.csv")
+
+```
+
+Step2: Examining the data
+
+-observe summary of data. value to be predicted is salesPrice.
+-drop id as an independent variable
+```{r }
+housing <- housing[-1]
+str(housing)
+```
+
+-examine distribution of sales price
+```{r }
+hist(housing$SalePrice, xlab = "Sale Prices", main = "Histogram of Sale Price", col = "green")
+
+```
+
+-examine distribution of property ages
+```{r }
+hist(housing$YearBuilt, xlab = "Year Built", main = "Histogram of Year Built", col = "blue")
+
+```
+
+- examine correlations of various independent variables & dependent variable SalePrice.
+```{r }
+cor(housing[c("SalePrice", "LotArea", "OverallQual", "YearBuilt", "YrSold", "OverallCond" , "GrLivArea", "PoolArea")])
+
+```
+
+-scatterplot matrix for variables
+
+```{r }
+pairs(housing[c("SalePrice", "LotArea", "OverallQual", "YearBuilt", "YrSold", "OverallCond" , "GrLivArea", "PoolArea")])
+
+```
+
+- another view of scatterplot for variables
+```{r }
+library(psych)
+pairs.panels(housing[c("SalePrice", "LotArea", "OverallQual", "YearBuilt", "YrSold", "OverallCond" , "GrLivArea", "PoolArea")])
+```
+
+- examine missing values
+```{r }
+library(Amelia)
+missmap(housing, main = "Missing values vs observed")
+
+```
+
+- include NA as a factor for categorical variables with NA (not applicable) as an option
+```{r }
+housing$Alley <- addNA(housing$Alley)
+housing$PoolQC <- addNA(housing$PoolQC)
+housing$MiscFeature <- addNA(housing$MiscFeature)
+housing$Fence <- addNA(housing$Fence)
+housing$FireplaceQu <- addNA(housing$FireplaceQu)
+housing$GarageCond <- addNA(housing$GarageCond)
+housing$GarageQual <- addNA(housing$GarageQual)
+housing$GarageFinish <- addNA(housing$GarageFinish)
+housing$GarageType <- addNA(housing$GarageType)
+housing$BsmtQual <- addNA(housing$BsmtQual)
+housing$BsmtCond <- addNA(housing$BsmtCond)
+housing$BsmtExposure <- addNA(housing$BsmtExposure)
+housing$BsmtFinType1 <- addNA(housing$BsmtFinType1)
+housing$BsmtFinType2 <- addNA(housing$BsmtFinType2)
+```
+
+- drop LotFrontage, GarageYrBlt, MasVnrArea, MasVnrType, neighborhood because of missing values wherein NA not as an option.
+```{r }
+housing <- housing[c(-3, -59, -26, -25)]
+```
+
+- re-examine missing values
+```{r }
+missmap(housing, main = "Missing values vs observed")
+```
+
+- after removing and factoring NA, there is only 1 observation with missing value.
+```{r }
+sapply(housing,function(x) sum(is.na(x)))
+```
+
+- splitting data into training, validation and test.
+```{r }
+indx = sample(1:nrow(housing), as.integer(0.60*nrow(housing)))
+housing_train = housing[indx,]
+housing_test = housing[-indx,]
+indx2 = sample(1:nrow(housing_test), as.integer(0.6*nrow(housing_test)))
+housing_validation = housing_test[-indx2,]
+housing_test = housing_test[indx2,]
+```
+
+Model A: LINEAR Regression Model 
+Step3: Training the model
+```{r }
+model <- lm(SalePrice ~ LotArea + OverallQual + GrLivArea + GarageCars + YearBuilt + TotalBsmtSF + WoodDeckSF, data = housing_train)
+summary(model)
+```
+
+Step4: Measuring Performance
+
+- make predictions and evaluate RMSE
+```{r }
+my_predictions  <-predict(model, housing_test)
+
+rmse <- function(error)
+{
+    sqrt(mean(error^2))
+}
+
+housing_test_actual = housing_test[, 76]
+error <- housing_test_actual - my_predictions
+rmse(error)
+ 
+```
+
+Step5: Improving Performance
+
+- include more significant predictors. As seen in output, this improves RSquare for training data since more predictors are added.
+```{r }
+model2 <- lm(SalePrice ~ LotArea + OverallQual + GrLivArea  + YearBuilt + TotalBsmtSF + WoodDeckSF + BedroomAbvGr + KitchenAbvGr + GarageArea  + ScreenPorch , data = housing_train)
+summary(model2)
+```
+
+- make predictions and evaluate RMSE. 
+```{r }
+my_predictions2  <-predict(model2, housing_test)
+
+error <- housing_test_actual - my_predictions2
+rmse(error)
+ 
+```
+
+ModelB: Regression Tree
+
+Step 3: Training the model
+
+```{r }
+library(rpart)
+model3_decisiontree1 <- rpart(SalePrice ~ ., data = housing_train)
+summary(model3_decisiontree1) 
+```
+
+- Step 4: Evaluating Model Performance
+
+- use rpart decision tree and make predictions. examine rmse.
+```{r }
+my_prediction_decision_tree <- predict(model3_decisiontree1, housing_test)
+error_decision_tree <- housing_test_actual - my_prediction_decision_tree
+rmse(error_decision_tree)
+ 
+```
+
+- Step 5: Improving Model Performance
+
+- implement a Bagged Regeression Tree
+
+```{r }
+library(ipred)
+set.seed(300)
+model4_decision_tree_ipred <- bagging(SalePrice ~ ., data = housing, nbagg = 25)
+```
+
+- make predictions and examine rmse. 
+
+```{r }
+my_prediction_decision_tree_ipred <- predict(model4_decision_tree_ipred, housing_test)
+error_decision_tree_ipred <- housing_test_actual - my_prediction_decision_tree_ipred
+rmse(error_decision_tree_ipred)
+```
+
+ModelC: Random Forest
+
+Step3: Training the model
+
+- implement a random forest using significant continous variable predictors
+```{r }
+library(randomForest)
+set.seed(300)
+rf <- randomForest(SalePrice ~ LotArea + OverallQual + GrLivArea + GarageCars + YearBuilt + TotalBsmtSF + WoodDeckSF, data = housing_train, na.action = na.omit)
+rf
+```
+
+Step4 : Evaluating model performance
+
+```{r }
+predictions_rf <- predict(rf, housing_test)
+error_rf <- housing_test_actual - predictions_rf
+rmse(error_rf)
+```
+
+Step 5: Improving model performance
+
+- auto-tune random forest
+```{r }
+library(caret)
+ctrl <- trainControl(method = "repeatedcv",
+                     number = 10, repeats = 10)
+
+# auto-tune a random forest
+grid_rf <- expand.grid(.mtry = c(2, 4, 8, 16))
+
+set.seed(300)
+m_rf <- train(SalePrice ~ ., data = housing_train, method = "rf", trControl = ctrl,
+              tuneGrid = grid_rf, na.action = na.omit)
+m_rf
+```
+
+- examine rmse of random forest
+```{r }
+predictions_mrf <- predict(m_rf, housing_test)
+error_mrf <- housing_test_actual - predictions_mrf
+rmse(error_mrf)
+```
+
