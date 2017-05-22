@@ -1,6 +1,6 @@
 ---
 title: "Project"
-author: "Rafael Asuncion"
+author: "Rafael Asuncion and Erik Babb"
 date: "May 18, 2017"
 output: word_document
 ---
@@ -9,7 +9,8 @@ Step1: Collecting the data
 
 For this data exploration, we shall be examining the Ames Housing Dataset
 ```{r cars}
-housing <- read.csv("C:/Users/Rafael Asuncion/Documents/WORK/Capstone/train.csv")
+#housing <- read.csv("C:/Users/Rafael Asuncion/Documents/WORK/Capstone/train.csv")
+housing <- read.csv("C:/Users/eb832f/Documents/Data Science/CSUEB/Spring 2017/Capstone/Raf/train.csv")
 
 ```
 
@@ -24,6 +25,7 @@ str(housing)
 
 -examine distribution of sales price
 ```{r }
+summary(housing$SalePrice)
 hist(housing$SalePrice, xlab = "Sale Prices", main = "Histogram of Sale Price", col = "green")
 
 ```
@@ -32,6 +34,15 @@ hist(housing$SalePrice, xlab = "Sale Prices", main = "Histogram of Sale Price", 
 ```{r }
 hist(housing$YearBuilt, xlab = "Year Built", main = "Histogram of Year Built", col = "blue")
 
+```
+
+-examine LotArea and 1st Floor Square Feet
+```{r}
+library(ggplot2)
+ggplot(data=housing, aes(x=LotArea, y=X1stFlrSF)) + geom_point(color="black")
+ggplot(data=housing, aes(x=LotArea, y=X1stFlrSF)) + geom_point(aes(color=SalePrice)) +
+  xlim(0, 50000) + 
+  ylim(0, 4000)
 ```
 
 - examine correlations of various independent variables & dependent variable SalePrice.
@@ -55,9 +66,13 @@ pairs.panels(housing[c("SalePrice", "LotArea", "OverallQual", "YearBuilt", "YrSo
 
 - examine missing values
 ```{r }
+#View all the NAs
+na_count <- sapply(housing, function(y) sum(length(which(is.na(y)))))
+na_count <- data.frame(na_count)
+na_count
+
 library(Amelia)
 missmap(housing, main = "Missing values vs observed")
-
 ```
 
 - include NA as a factor for categorical variables with NA (not applicable) as an option
@@ -80,7 +95,24 @@ housing$BsmtFinType2 <- addNA(housing$BsmtFinType2)
 
 - drop LotFrontage, GarageYrBlt, MasVnrArea, MasVnrType, neighborhood because of missing values wherein NA not as an option.
 ```{r }
-housing <- housing[c(-3, -59, -26, -25)]
+housing <- housing[c(-3, -59, -26, -25)] #why drop and not just fill with mode?
+
+
+#Drop features which have more than half of their values as NA
+half_missing <- nrow(housing) / 2
+drop_cols <- list()
+for(j in names(housing)) {
+  #print(na_count[j, ])
+  if (na_count[j, ] >= (half_missing)) {
+    drop_cols[[j]] <- TRUE
+  }
+  else {
+    drop_cols[[j]] <- FALSE
+  }
+}
+names(drop_cols[drop_cols=='TRUE']) #There are 4 features to drop: Alley, PoolQC, Fence, MiscFeature
+train_NAsDropped <- housing[ , !(names(housing) %in% names(drop_cols[drop_cols=='TRUE']))]
+
 ```
 
 - re-examine missing values
