@@ -13,8 +13,8 @@ Step1: Collecting the data
 
 For this data exploration, we shall be examining the Ames Housing Dataset
 ```{r Load data}
-#housing <- read.csv("C:/Users/Rafael Asuncion/Documents/WORK/Capstone/train.csv")
-housing <- read.csv("C:/Users/eb832f/Documents/Data Science/CSUEB/Spring 2017/Capstone/Raf/train.csv")
+housing <- read.csv("C:/Users/Rafael Asuncion/Documents/WORK/Capstone/train.csv")
+#ousing <- read.csv("C:/Users/eb832f/Documents/Data Science/CSUEB/Spring 2017/Capstone/Raf/train.csv")
 #train <- read.csv("C:/Users/eb832f/Documents/Data Science/CSUEB/Spring 2017/Capstone/train.csv")
 ```
 
@@ -138,11 +138,11 @@ write.csv(train_NAsToMode, file = "train_NAsToMode.csv",row.names=FALSE)
 ```{r}
 #Convert Integer to Factor
 train_IntsToFactors <- housing
-train_IntsToFactors$MSSubClass <- as.factor(train$MSSubClass)
-train_IntsToFactors$KitchenAbvGr <- as.factor(train$KitchenAbvGr)
-train_IntsToFactors$OverallCond <- as.factor(train$OverallCond)
-train_IntsToFactors$YrSold <- as.factor(train$YrSold)
-train_IntsToFactors$MoSold <- as.factor(train$MoSold)
+train_IntsToFactors$MSSubClass <- as.factor(train_IntsToFactors$MSSubClass)
+train_IntsToFactors$KitchenAbvGr <- as.factor(train_IntsToFactors$KitchenAbvGr)
+train_IntsToFactors$OverallCond <- as.factor(train_IntsToFactors$OverallCond)
+train_IntsToFactors$YrSold <- as.factor(train_IntsToFactors$YrSold)
+train_IntsToFactors$MoSold <- as.factor(train_IntsToFactors$MoSold)
 write.csv(train_IntsToFactors, file = "train_IntsToFactors.csv",row.names=FALSE)
 ```
 
@@ -228,18 +228,25 @@ housing_test = housing[-indx,]
 
 train1 <- train_DropNAs[indx,]
 test1 <- train_DropNAs[-indx,]
+test1_actual = test1[, "SalePrice"]
 
 train2 <- train_NAsToMode[indx,]
 test2 <- train_NAsToMode[-indx,]
+test2_actual = test2[, "SalePrice"]
 
 train3 <- train_IntsToFactors[indx,]
 test3 <- train_IntsToFactors[-indx,]
+test3_actual = test3[, "SalePrice"]
 
 train4 <- train_NoNomVars[indx,]
 test4 <- train_NoNomVars[-indx,]
+test4_actual = test4[, "SalePrice"]
 
 train5 <- train_OrdDefined[indx,]
 test5 <- train_OrdDefined[-indx,]
+test5_actual = test5[, "SalePrice"]
+
+housing_test_actual = housing_test[, "SalePrice"]
 
 #What does this do? train and test are already created above
 #indx2 = sample(1:nrow(housing_test), as.integer(0.6*nrow(housing_test)))
@@ -275,7 +282,7 @@ rmse <- function(error)
     sqrt(mean(error^2))
 }
 
-housing_test_actual = housing_test[, "SalePrice"]
+
 error <- housing_test_actual - my_predictions
 rmse(error)
  
@@ -325,7 +332,7 @@ rmse(error_decision_tree)
 ```{r }
 library(ipred)
 set.seed(300)
-model4_decision_tree_ipred <- bagging(SalePrice ~ ., data = housing, nbagg = 25)
+model4_decision_tree_ipred <- bagging(SalePrice ~ ., data = housing_train, nbagg = 25)
 ```
 
 - make predictions and examine rmse. 
@@ -365,12 +372,9 @@ library(caret)
 
 ctrl <- trainControl(method = "cv", number = 5) #faster
 
-# auto-tune a random forest
-grid_rf <- expand.grid(.mtry = c(2, 4, 8, 16))
-
 set.seed(300)
-m_rf <- train(SalePrice ~ ., data = housing_train, method = "rf", trControl = ctrl,
-              tuneGrid = grid_rf, na.action = na.omit)
+m_rf <- train(SalePrice ~ LotArea + OverallQual + GrLivArea + GarageCars + YearBuilt + TotalBsmtSF + WoodDeckSF, data = housing_train, method = "rf", trControl = ctrl,
+              na.action = na.omit)
 m_rf
 ```
 
@@ -381,12 +385,197 @@ error_mrf <- housing_test_actual - predictions_mrf
 rmse(error_mrf)
 ```
 
-```{r}
-m_rf1 <- train(SalePrice ~ ., data = train1, method = "rf", trControl = ctrl,
-              tuneGrid = grid_rf, na.action = na.omit)
-predictions_mrf1 <- predict(m_rf1, test1)
-error_mrf1 <- test1[, "SalePrice"] - predictions_mrf1
-rmse(error_mrf1)
+Model D: SvM
 
+Step3: Train SVM Vanilladot model
+
+```{r }
+library(kernlab)
+model5_svm <- ksvm(SalePrice ~ LotArea + OverallQual + GrLivArea + GarageCars + YearBuilt + TotalBsmtSF + WoodDeckSF, data = housing_train, kernel = "vanilladot")
+model5_svm
+```
+
+Step4: Evaluating model performance
+
+- make predictions and examine RMSE 
+```{r }
+predictions_svm <- predict(model5_svm, housing_test)
+error_svm <- housing_test_actual - predictions_svm
+rmse(error_svm)
+```
+
+Step5: Improving mode performance
+
+- train rbfdot svm
+```{r }
+library(kernlab)
+model5_svm_rbf <- ksvm(SalePrice ~ LotArea + OverallQual + GrLivArea + GarageCars + YearBuilt + TotalBsmtSF + WoodDeckSF, data = housing_train, kernel = "rbfdot")
+predictions_svm_rbf <- predict(model5_svm_rbf, housing_test)
+error_svm_rbf <- housing_test_actual - predictions_svm_rbf
+rmse(error_svm_rbf)
+```
+
+After investigating performance of original housing dataset, we have found that bagged regression trees, random forests and SVM
+have the best performance and make the most accurate predictions on the test dataset based on RMSE. 
+
+To enhance performance even more, we will make use of the modified datasets preivously created on bagged regression trees, random forests and SVM and examine performance.
+
+Bagged Regression Tree
+
+- original dataset RMSE
+```{r }
+rmse(error_decision_tree_ipred)
+```
+
+- Set1 Bagged Regression Tree RMSE
+```{r }
+library(ipred)
+set.seed(300)
+model_bagged_train1 <- bagging(SalePrice ~ ., data = train1, nbagg = 25)
+pred_test1_bagged <- predict(model_bagged_train1, test1)
+error_test1_bagged <- test1_actual - pred_test1_bagged
+rmse(error_test1_bagged)
+```
+
+- Set2 Bagged Regression Tree RMSE
+```{r }
+set.seed(300)
+model_bagged_train2 <- bagging(SalePrice ~ ., data = train2, nbagg = 25)
+pred_test2_bagged <- predict(model_bagged_train2, test2)
+error_test2_bagged <- test2_actual - pred_test2_bagged
+rmse(error_test2_bagged)
+```
+
+- Set3 Bagged Regression Tree RMSE
+```{r }
+set.seed(300)
+model_bagged_train3 <- bagging(SalePrice ~ ., data = train3, nbagg = 25)
+pred_test3_bagged <- predict(model_bagged_train3, test3)
+error_test3_bagged <- test3_actual - pred_test3_bagged
+rmse(error_test3_bagged)
+```
+
+- Set4 Bagged Regression Tree RMSE
+```{r }
+set.seed(300)
+model_bagged_train4 <- bagging(SalePrice ~ ., data = train4, nbagg = 25)
+pred_test4_bagged <- predict(model_bagged_train4, test4)
+error_test4_bagged <- test4_actual - pred_test4_bagged
+rmse(error_test4_bagged)
+```
+
+- Set5 Bagged Regression Tree RMSE
+```{r }
+model_bagged_train5 <- bagging(SalePrice ~ ., data = train5, nbagg = 25)
+pred_test5_bagged <- predict(model_bagged_train5, test5)
+error_test5_bagged <- test5_actual - pred_test5_bagged
+rmse(error_test5_bagged)
+```
+
+Random Forest
+
+- original random forest rmse
+```{r }
+rmse(error_rf)
+```
+
+- Set1 Random Forest
+```{r }
+model_rf_train1 <- randomForest(SalePrice ~ LotArea + OverallQual + GrLivArea + GarageCars + YearBuilt + TotalBsmtSF + WoodDeckSF, data = train1, na.action = na.omit)
+predictions_rf_train1 <- predict(model_rf_train1, test1)
+error_rf_train1 <- test1_actual - predictions_rf_train1
+rmse(error_rf_train1)
+```
+
+- Set2 Random Forest
+```{r }
+model_rf_train2 <- randomForest(SalePrice ~ LotArea + OverallQual + GrLivArea + GarageCars + YearBuilt + TotalBsmtSF + WoodDeckSF, data = train2, na.action = na.omit)
+predictions_rf_train2 <- predict(model_rf_train2, test2)
+error_rf_train2 <- test2_actual - predictions_rf_train2
+rmse(error_rf_train2)
+```
+
+- Set3 Random Forest
+```{r }
+model_rf_train3 <- randomForest(SalePrice ~ LotArea + OverallQual + GrLivArea + GarageCars + YearBuilt + TotalBsmtSF + WoodDeckSF, data = train3, na.action = na.omit)
+predictions_rf_train3 <- predict(model_rf_train3, test3)
+error_rf_train3 <- test3_actual - predictions_rf_train3
+rmse(error_rf_train3)
+```
+
+- Set4 Random Forest
+```{r }
+model_rf_train4 <- randomForest(SalePrice ~ LotArea + GrLivArea + GarageCars + YearBuilt + TotalBsmtSF + WoodDeckSF, data = train4, na.action = na.omit)
+predictions_rf_train4 <- predict(model_rf_train4, test4)
+error_rf_train4 <- test4_actual - predictions_rf_train4
+rmse(error_rf_train4)
+```
+
+- Set5 Random Forest
+```{r }
+model_rf_train5 <- randomForest(SalePrice ~ LotArea + OverallQual + GrLivArea + GarageCars + YearBuilt + TotalBsmtSF + WoodDeckSF, data = train5, na.action = na.omit)
+predictions_rf_train5 <- predict(model_rf_train5, test5)
+error_rf_train5 <- test5_actual - predictions_rf_train5
+rmse(error_rf_train5)
+```
+
+SVM
+
+- original SVM RMSE
+
+```{r }
+rmse(error_svm)
+```
+
+- Set1 SVM
+```{r }
+model_svm_train1 <- ksvm(SalePrice ~ ., data = train1, kernel = "vanilladot")
+pred_svm_train1 <- predict(model_svm_train1, test1)
+error_svm_train1 <- test1_actual - pred_svm_train1
+rmse(error_svm_train1)
+```
+
+- Set2 SVM
+```{r }
+model_svm_train2 <- ksvm(SalePrice ~ LotArea + OverallQual + GrLivArea + GarageCars + YearBuilt + TotalBsmtSF + WoodDeckSF, data = train2, kernel = "vanilladot")
+pred_svm_train2 <- predict(model_svm_train2, test2)
+error_svm_train2 <- test2_actual - pred_svm_train2
+rmse(error_svm_train2)
+```
+
+- Set3 SVM
+```{r }
+model_svm_train3 <- ksvm(SalePrice ~ LotArea + OverallQual + GrLivArea + GarageCars + YearBuilt + TotalBsmtSF + WoodDeckSF, data = train3, kernel = "vanilladot")
+pred_svm_train3 <- predict(model_svm_train3, test3)
+error_svm_train3 <- test3_actual - pred_svm_train3
+rmse(error_svm_train3)
+```
+
+- Set4 SVM
+```{r }
+model_svm_train4 <- ksvm(SalePrice ~ LotArea + GrLivArea + GarageCars + YearBuilt + TotalBsmtSF + WoodDeckSF, data = train4, kernel = "vanilladot")
+pred_svm_train4 <- predict(model_svm_train4, test4)
+error_svm_train4 <- test4_actual - pred_svm_train4
+rmse(error_svm_train4)
+```
+
+- Set5 SVM
+```{r }
+model_svm_train5 <- ksvm(SalePrice ~ LotArea + GrLivArea + GarageCars + YearBuilt + TotalBsmtSF + WoodDeckSF, data = train5, kernel = "vanilladot")
+pred_svm_train5 <- predict(model_svm_train5, test5)
+error_svm_train5 <- test5_actual - pred_svm_train5
+rmse(error_svm_train5)
+```
+
+CONCLUSION OF FINDINGS
+
+After testing re-engineered datasets on Bagged Regression Trees, Random Forests and SVM we have found that the lowest RMSE upon testing is when SVM is used on Set1.
+
+- Best Model with lowest Test RMSE
+```{r }
+model_svm_train1 <- ksvm(SalePrice ~ ., data = train1, kernel = "vanilladot")
+pred_svm_train1 <- predict(model_svm_train1, test1)
+error_svm_train1 <- test1_actual - pred_svm_train1
+rmse(error_svm_train1)
 ```
 
